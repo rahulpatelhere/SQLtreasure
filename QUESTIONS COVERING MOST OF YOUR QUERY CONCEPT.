@@ -1,0 +1,463 @@
+QUESTIONS COVERING ALMOST EVERY QUERY CONCEPT OF YOURS.
+-- Find departments where at least one employee has commission more than 1000.
+select deptno
+from emp
+where comm is not null and comm > 1000;
+
+
+-- List employees whose salary is less than the salary of 'BLAKE'.
+select *
+from emp
+where sal < (
+select sal 
+from emp 
+where ename = 'blake'
+);
+
+-- List employees who joined after 'SCOTT'.
+select *
+from emp
+where hiredate > (
+select hiredate
+from emp
+where ename = 'scott'
+);
+
+
+-- Find employees working in departments located in 'DALLAS'.
+select *
+from emp
+where deptno in (
+select deptno
+from dept
+where loc = 'dallas'
+);
+
+
+-- Find employees who are earning the maximum salary in their department.
+select *
+from emp e
+where sal = (
+select max(sal)
+from emp e1
+where e.deptno = e1.deptno
+);
+
+
+-- Find employees who earn more than the average salary of their department.
+select e.*
+from emp e
+where sal > (
+select avg(sal)
+from emp e1
+where e.deptno = e1.deptno
+);
+
+-- List employees who are the only ones in their department.
+select e.ename,e.deptno
+from emp e
+join (
+select deptno,count(*)
+from emp
+group by deptno
+having count(*) = 1
+) f on e.deptno = f.deptno;
+
+
+-- Find employees who have the same salary as someone else in a different department.
+select e.*
+from emp e
+join emp e1 on e.sal = e1.sal 
+where e.deptno <> e1.deptno and e.empno <> e1.empno;
+
+
+-- List employees who are not managers.
+select *
+from emp
+where empno not in (
+select mgr
+from emp
+);
+
+
+-- Find employees who earn more than their manager.
+select e.ename,e.sal,m.ename,m.sal
+from emp e
+join emp m
+on e.mgr = m.empno
+where e.sal > m.sal;
+
+
+-- List departments where all employees earn more than 1000.
+select d.dname
+from dept d
+join emp e on d.deptno = e.deptno
+group by d.dname
+having min(sal)>1000;
+
+/* List jobs where at least one employee earns more than all employees of 
+'RESEARCH' department. */
+select job
+from emp
+where sal >
+(
+select max(sal)
+from emp
+where deptno = (
+select deptno
+from dept
+where dname = 'research'
+));
+
+/* Find employees whose salary is greater than the average salary of all
+ employees in the same job role.*/
+select ename, sal, job, avg_sal
+from (
+select ename, sal, job, avg(sal) over(partition by job) as avg_sal
+from emp
+) t
+where sal > avg_sal
+order by sal;
+
+select ename,sal,job
+from emp e
+where sal > (
+select avg(sal)
+from emp e1
+where e.job = e1.job
+);
+
+/* List employees whose salary is higher than the salary of at least two other 
+employees in their own department. */
+select *
+from emp e
+where (
+select count(*)
+from emp e1
+where e.deptno = e1.deptno and e.sal > e1.sal
+)>=2;
+
+select distinct e.ename, e.sal, e.deptno
+from emp e
+join emp e1 on e.deptno = e1.deptno and e.sal > e1.sal
+group by e.ename, e.sal, e.deptno
+having count(*) >= 2;
+
+/* List department name, total salary, and average salary in each department. */
+select d.dname,sum(e.sal),avg(e.sal)
+from emp e
+join dept d on e.deptno = d.deptno
+group by d.dname;
+
+select (select dname from dept where e.deptno = deptno) as dname,sum(sal),avg(sal)
+from emp e
+group by dname;
+
+/* List employee names who earn more than the average salary of their department,
+ along with department name. */
+with cte as (
+select e.deptno,d.dname,avg(e.sal) as avg_salary
+from emp e
+join dept d on e.deptno = d.deptno
+group by e.deptno,d.dname
+) 
+select e.ename,e.sal,c.dname,c.avg_salary
+from emp e
+join cte c on e.deptno = c.deptno
+where e.sal > c.avg_salary
+order by c.avg_salary;
+
+select e.ename, e.sal, d.dname
+from emp e
+join dept d on e.deptno = d.deptno
+where e.sal > (
+select avg(sal) 
+from emp 
+where deptno = e.deptno
+);
+
+select e.ename,e.sal,(select dname from dept where e.deptno = deptno) as dname
+from emp e
+where sal > (
+select avg(sal)
+from emp 
+where e.deptno=deptno);
+
+/* List department name and count of managers in that department. */
+select d.dname,count(*)
+from dept d
+join emp e on e.deptno=d.deptno
+where job = 'manager'
+group by d.dname;
+
+select d.dname,count(distinct m.empno)
+from dept d
+join emp m on m.deptno = d.deptno
+join emp e on e.mgr = m.empno
+group by d.dname;
+
+
+/* List names of employees working in the department with the highest 
+average salary. */
+select ename,deptno
+from emp
+where deptno = (
+select deptno
+from emp
+group by deptno
+order by avg(sal) desc
+limit 1
+);
+
+
+with cte as (
+select deptno,avg(sal) as avg_sal,
+rank() over(order by avg(sal) desc) rnk
+from emp
+group by deptno
+)
+select e.ename,e.sal,e.deptno
+from emp e
+join cte c on e.deptno = c.deptno
+where c.rnk = 1;
+
+/* Find department names with more than one employee having the same job. */
+select distinct d.dname 
+from dept d
+join (
+select deptno,job
+from emp 
+group by deptno,job
+having count(*)>1
+) e on d.deptno = e.deptno;
+
+select dname
+from dept
+where deptno in (
+select deptno
+from emp
+group by deptno,job
+having count(*)>1);
+
+/* List employees who earn a commission, along with their department name 
+and location. */
+select e.ename,e.comm,d.dname,d.loc
+from emp e
+join dept d on e.deptno = d.deptno
+where comm is not null and comm>0;
+
+select ename,comm,
+(select dname from dept where deptno = e.deptno) dname,
+(select loc from dept where deptno = e.deptno) loc
+from emp e
+where comm is not null and comm>0;
+
+/* Find names of employees who joined earliest in each department. */
+select e.ename, e.deptno, e.hiredate
+from emp e
+where e.hiredate = (
+select min(hiredate)
+from emp
+where deptno = e.deptno
+);
+
+select e.ename,d.dname,e.hiredate
+from emp e
+join dept d on e.deptno = d.deptno
+where hiredate = (
+select min(hiredate)
+from emp e1
+where e.deptno = e1.deptno);
+
+select ename,dname,hiredate 
+from (
+select e.ename,d.dname,e.hiredate, rank() over(partition by e.deptno order by hiredate) as rnk
+from emp e
+join dept d on e.deptno = d.deptno
+) t
+where rnk = 1;
+
+
+/* List top 3 highest-paid employees with department name.*/
+select e.ename,e.sal,d.dname
+from (
+select e.*,rank() over( order by sal desc) as rnk
+from emp e
+) as e
+join dept d on e.deptno = d.deptno
+where rnk <= 3;
+
+select e.*,d.dname
+from emp e
+join dept d
+on e.deptno = d.deptno
+order by e.sal desc
+limit 3;
+
+select e.*,(select dname from dept where deptno = e.deptno) as dname
+from emp e
+order by sal desc
+limit 3;
+
+
+
+# emp having same deptname as scott
+select *,(select dname from dept where deptno = e.deptno) as dname
+from emp e 
+where deptno = (
+select deptno
+from dept 
+where dname = (
+select dname
+from dept
+where deptno = (
+select deptno
+from emp
+where ename = 'scott'
+)));
+
+
+/* 
+List employee names and department names for employees whose salary 
+is above the average salary of their department, along with their rank 
+within the department by salary. Also, order the result by department and
+descending salary also show the difference from the average salary.
+*/
+select ename,deptno,dname,sal,`average`,`difference`,
+rank() over(partition by deptno order by sal desc) as `salary rank`
+from (
+select e.ename,d.deptno,d.dname,e.sal,
+avg(sal) over(partition by e.deptno) as `average`,
+e.sal-avg(sal) over(partition by e.deptno) as `difference`
+from emp e
+join dept d on e.deptno = d.deptno
+) t
+where sal > `average`
+order by deptno;
+
+/* 
+List the top 3 highest paid employees in each department, 
+showing employee name, department, salary, and their rank within the department.
+*/
+select ename,deptno,sal,rnk 
+from (
+select ename,deptno,sal,
+dense_rank() over(partition by deptno order by sal desc) as rnk
+from emp
+) t
+where rnk <=3;
+
+
+
+/* 
+List employees who earn more than their manager, 
+along with their manager's name and the difference in salary.
+*/
+select e.*,m.ename,e.sal-m.sal as `difference`
+from emp e
+join emp m on e.mgr = m.empno
+where e.sal>m.sal;
+
+/* 
+For each department, list employees ordered by hire date,
+showing a running total of salaries.
+*/
+select ename,deptno,hiredate,sal,
+sum(sal) over(partition by deptno order by hiredate) as cum_sum
+from emp
+order by deptno,hiredate;
+
+/* 
+For each employee, show their salary as a percentage 
+of the total salary in their department.
+*/
+
+select ename,deptno,sal,total_sal,round((sal/total_sal)*100,1) as Percentage
+from (
+select ename,deptno,sal,sum(sal) over(partition by deptno) as total_sal
+from emp
+) t ;
+
+/* 
+List pairs of employees who joined consecutively 
+by hire date within each department.
+*/
+select deptno,
+ename  as employee,
+hiredate as emp_hiredate,
+lead(ename) over(partition by deptno order by hiredate) as next_employee,
+lead(hiredate) over(partition by deptno order by hiredate) as next_hiredate
+from emp
+order by deptno, hiredate;
+
+/* 
+For each job role, list the employee(s) 
+with the highest salary.
+*/
+select ename,deptno,sal,job
+from (
+select ename,deptno,sal,job,
+rank() over(partition by job order by sal desc) as rnk
+from emp
+) t
+where rnk = 1;
+
+/* 
+List employees whose salary is above the company-wide average salary 
+but below the maximum salary in their department.
+*/
+with max_sal as (
+select deptno,max(sal)max_sal
+from emp
+group by deptno
+)
+
+select e.ename,e.deptno,e.sal,(select round(avg(sal),2) from emp) avg_sal,m.max_sal
+from emp e
+join max_sal m on e.deptno = m.deptno
+where e.sal > (select avg(sal) from emp) and e.sal < max_sal;
+
+/* 
+List departments where more than one employee 
+shares the maximum salary.
+*/
+
+with cte as (
+select deptno,max(sal) as max_sal
+from emp
+group by deptno
+)
+select e.deptno,count(*) as emp_count
+from emp e
+join cte c on e.deptno = c.deptno and e.sal = c.max_sal
+group by e.deptno
+having count(*)>1;
+
+
+/* 
+For each department, show the difference 
+between the highest and lowest salaries.
+*/
+with max_sal as (
+select deptno,max(sal) as maximum
+from emp
+group by deptno
+),
+min_sal as (
+select deptno,min(sal) as minimum
+from emp
+group by deptno
+)
+select m1.deptno,m1.maximum,m2.minimum,m1.maximum-m2.minimum as diff
+from max_sal m1 
+join min_sal m2 on m1.deptno = m2.deptno;
+ 
+
+
+
+
+
+
+
+
+
